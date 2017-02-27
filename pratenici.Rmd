@@ -1,0 +1,148 @@
+---
+title: "Колку тежи македонскиот парламент? Дел 1: Родова анализа"
+author: "DiscindoDataBrew"
+output:
+  html_document:
+    highlight: haddock
+    theme: cerulean
+    toc: true
+  pdf_document: default
+header-includes:
+- \usepackage{fancyhdr}
+- \usepackage[T1,T2A]{fontenc}
+- \pagestyle{fancy}
+- \fancyhead[CO,CE]{This is fancy header}
+- \fancyfoot[CO,CE]{And this is a fancy footer}
+- \fancyfoot[LE,RO]{\thepage}
+#runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=FALSE)
+```
+
+```{r}
+suppressPackageStartupMessages(library("knitr"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("tidyr"))
+suppressPackageStartupMessages(library("RColorBrewer"))
+suppressPackageStartupMessages(library("shiny"))
+```
+
+```{r}
+DFM <- read.csv("pratenici-merged.csv", header=TRUE)
+```
+
+## За
+
+Овој документ прикажува податоци за имот на пратеници во Република Македонија објавени од страна на Државната комисија за спречување на корупцијата по конституирање на новиот парламентарен состав во декември 2016.
+
+Податоците се за 100 пратеници бидејќи на веб-сајтот на комисијата заклучно со 24.02.2017 само толку анкетни листови се објавени/ажурирани.
+
+Ако најдете грешки, пријавете [тука](https://github.com/novica/databrew/issues). Изворниот код може да се преземе [тука](https://github.com/novica/databrew/).
+
+## Вовед
+
+Во Собранието на Република Македонија има 120 пратеници. Вкупниот сооднос е 38 жени и 82 мажи. Подолу се податоци за 100 од нив: 28 жени и 72 мажи.
+
+Вкупниот имот на овие 100 македонските пратеници е 24 милиони 725 илјади евра пресметан како збир од сите видови имоти минус долговите. [Колку се 24 милиони евра](https://www.google.com/#q=24+%D0%BC%D0%B8%D0%BB%D0%B8%D0%BE%D0%BD%D0%B8+%D0%B5%D0%B2%D1%80%D0%B0)? 
+
+```{r}
+# Колку мажи / жени има во дата фрејмот?
+# DF1 <- DFM %>% 
+#   select(Name, Gender) %>%
+#   unique() %>%
+#   select(Gender) %>% 
+#   table %>%
+#   as.data.frame
+# 
+# DF1 %>% knitr::kable()
+```  
+
+### Вкупно имот по тип
+
+Македонските пратеници и нивните семејства најмногу поседуваат недвижен имот. Всушност сите други видови на имот се на износ близу до долговите што ги имаат пратениците, па така 24-те милиони евра се горе-долу вредноста на недвижниот имот.
+
+```{r}
+DF2 <- DFM %>% group_by(Property) %>% 
+  select(Property, Property.EUR) %>%
+  filter(!(Property == "")) %>%
+  summarise(Вкупно=sum(Property.EUR,na.rm = TRUE)) %>%
+  arrange(desc(Вкупно)) %>%
+  mutate(Имот=Property) %>%
+  select(Имот, Вкупно)
+
+knitr::kable(DF2, digits=0, caption="Табела 1: Вкупно имот во евра по тип на имот", format.args = list(decimal.mark = ",", big.mark = "."))
+```
+
+```{r, fig.cap="Слика 1: Вкупно имот по тип на имот"}
+ggplot(DF2, aes(y=Вкупно/10000, x=Имот, fill=Вкупно/10000)) +
+  geom_bar(stat = 'identity') +
+  scale_fill_continuous(name="Вкупно во\n10.000 ЕУР") +
+  xlab("") +
+  ylab("Вкупно имот во 10.000 евра") +
+  coord_cartesian() +
+  coord_flip() +
+  theme_bw()
+```
+
+### Родова распределба на имотот
+
+Родовата распределба на имотот открива јаз помеѓу мажите и жените во собранието, односно помеѓу нив и брачните другари. Табелите подолу го покажуваат вкупниот имот по тип на имот со кој што располагаат пратениците и брачните другари на пратеничките, односно пратеничките и брачните другари на пратениците.
+
+Најинтересен е податокот дека жените: пратеничките + брачните другари на пратениците, се главните носители на задолженоста во Собранието. 
+
+```{r}
+DFLI <- DFM[DFM$Ownership == 'Личен имот',]
+DFBD <- DFM[DFM$Ownership == 'Имот на брачен другар',]
+
+IMOT.MAZI <- rbind(DFLI[DFLI$Gender == ' М',], DFBD[DFBD$Gender == ' Ж',]) #sucks. there is extra space.
+IMOT.ZENI <- rbind(DFLI[DFLI$Gender == ' Ж',], DFBD[DFBD$Gender == ' М',])
+
+DF3 <- IMOT.MAZI %>% group_by(Property) %>% 
+  select(Property, Property.EUR) %>%
+  filter(!(Property == "")) %>%
+  summarise(Вкупно=sum(Property.EUR,na.rm = TRUE)) %>%
+  arrange(desc(Вкупно)) %>%
+  mutate(Имот=Property) %>%
+  select(Имот, Вкупно)
+
+knitr::kable(DF3, digits=0, caption="Табела 2: Вкупно имот по тип на имот во сопственост на мажи", format.args = list(decimal.mark = ",", big.mark = "."))
+
+DF4 <- IMOT.ZENI %>% group_by(Property) %>% 
+  select(Property, Property.EUR) %>%
+  filter(!(Property == "")) %>%
+  summarise(Вкупно=sum(Property.EUR,na.rm = TRUE)) %>%
+  arrange(desc(Вкупно)) %>%
+  mutate(Имот=Property) %>%
+  select(Имот, Вкупно)
+
+knitr::kable(DF4, digits=0, caption="Табела 3: Вкупно имот по тип на имот во сопственост на жени", format.args = list(decimal.mark = ",", big.mark = "."))
+```
+
+Подетална анализа на имотите укажува на тоа дека пратеничките и жените на пратениците се во значително понеповолна имотна состојба од нивните машки колеги. И брачните другари на пратеничките и нивните родители имаат повеќе нето имот од пратеничките. Пратеничките воглавно, и најмногу во однос на сите други, имаат долгови.
+
+```{r, fig.width=7,fig.height=12, fig.cap="Слика 2: Родова распределба на имот"}
+DFXX <- DFM %>% filter(Ownership %in% c("Личен имот", "Имот на брачен другар", "Имот на родители")) %>%
+  select(Ownership, Property.EUR, Property, Gender) %>%
+  mutate(Sex=ifelse(Gender==" Ж", "Жени:", "Мажи:")) %>%
+  mutate(Gender_Ownership=paste(Sex, Ownership, sep=" ")) %>%
+  mutate(GO=factor(Gender_Ownership, levels=c("Мажи: Личен имот", "Мажи: Имот на брачен другар", "Мажи: Имот на родители",
+                                              "Жени: Личен имот", "Жени: Имот на брачен другар", "Жени: Имот на родители")))
+
+DFXX.sum <- DFXX %>% group_by(Property, GO) %>%
+  summarise(Вкупно=sum(Property.EUR, na.rm=TRUE))
+
+ggplot(data=DFXX.sum, aes(y=Вкупно/10000, x=Property, fill=Вкупно/10000)) +
+  geom_bar(stat="identity") +
+  facet_wrap(~GO, drop = TRUE,nrow = 3,dir = "v") +
+  theme_bw() +
+  theme(legend.position=c(0.1,0.9),
+        axis.text.x=element_text(angle=45, vjust = 1, hjust=1)) +
+  scale_fill_continuous(name="") +
+  geom_text(aes(label=round(Вкупно/10000,0)), size=3, nudge_y = 30) +
+  ylab("Вкупно имот во 10.000 ЕУР") +
+  xlab("")
+```
