@@ -1,0 +1,126 @@
+---
+title: "Колку тежи македонскиот парламент? Дел 2: Возен парк"
+author: "DiscindoDataBrew"
+output:
+  html_document:
+    highlight: haddock
+    theme: cerulean
+    toc: true
+  pdf_document: default
+header-includes:
+- \usepackage{fancyhdr}
+- \usepackage[T1,T2A]{fontenc}
+- \pagestyle{fancy}
+- \fancyhead[CO,CE]{This is fancy header}
+- \fancyfoot[CO,CE]{And this is a fancy footer}
+- \fancyfoot[LE,RO]{\thepage}
+#runtime: shiny
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, cache=FALSE)
+```
+
+```{r}
+suppressPackageStartupMessages(library("knitr"))
+suppressPackageStartupMessages(library("dplyr"))
+suppressPackageStartupMessages(library("ggplot2"))
+suppressPackageStartupMessages(library("tidyr"))
+suppressPackageStartupMessages(library("RColorBrewer"))
+suppressPackageStartupMessages(library("shiny"))
+suppressPackageStartupMessages(library("wordcloud"))
+suppressPackageStartupMessages(library("tm"))
+suppressPackageStartupMessages(library("SnowballC"))
+```
+
+```{r}
+DFM <- read.csv("pratenici-merged.csv", header=TRUE)
+```
+
+## За
+
+Овој документ прикажува податоци за имот на пратеници во Република Македонија објавени од страна на Државната комисија за спречување на корупцијата по конституирање на новиот парламентарен состав во декември 2016.
+
+Податоците се за 100 пратеници бидејќи на веб-сајтот на комисијата до 24.02.2017 само толку анкетни листови се објавени/ажурирани.
+
+Ако најдете грешки, пријавете [тука](https://github.com/novica/databrew/issues). Изворниот код може да се преземе [тука](https://github.com/novica/databrew/).
+
+## Вовед
+
+Во Собранието на Република Македонија има 120 пратеници. Вкупниот сооднос е 38 жени и 82 мажи. Подолу се податоци за 100 од нив: 28 жени и 72 мажи.
+
+Вкупниот имот на овие 100 македонските пратеници е 24 милиони 725 илјади евра пресметан како збир од сите видови имоти минус долговите. [Колку се 24 милиони евра](https://www.google.com/#q=24+%D0%BC%D0%B8%D0%BB%D0%B8%D0%BE%D0%BD%D0%B8+%D0%B5%D0%B2%D1%80%D0%B0)? 
+
+### Возниот парк на пратениците
+
+Македонските пратеници и нивните семејства поседуваат вкупно 161 моторни возила со вкупна вредност од 1.756.270,00 евра. Просечната старост на пратеничките возила е 13,45 години. Тоа е помалку од републичкиот просек каде трендот се движи помеѓу [14,43 и 17,7 години](http://www.moepp.gov.mk/?page_id=5794).
+
+```{r}
+DF2 <- DFM %>% filter(Property.type == "Моторни возила")
+# Remove firearms from movable propery
+DF2$Property.EUR[DF2$Characteristic == "Оружје -/-"] <- NA 
+DF2$Property.EUR <- as.numeric(DF2$Property.EUR)
+#sum(DF2$Property.EUR, na.rm = TRUE)
+```
+
+Најпопуларно возило помеѓу пратениците е Фолксваген (28), а потоа следат Мерцедес (19) и Ауди (11). Помеѓу возилата има и еден Јагуар и две Југа. Најмногу моторни возила има пратеникот Борис Змејковски (8), а дури 10 пратеници и нивните семејства (вклучувајќи ги Зоран Заев и Никола Груевски) немаат ниту едно возило.
+
+```{r, fig.cap="Слика 1: Возилата на пратениците"}
+# Get the names of car manufacturers
+DF3 <- DFM %>% filter(Property.type == "Моторни возила")
+DF3$Characteristic <- as.character(DF3$Characteristic)
+# Helper to parse the car models 
+parse.cars <- function(x) {
+  y <- strsplit(x, split=" ") %>% unlist %>% unname
+  z <- y[1]
+  return(z)
+}   
+
+DF3$Car <- sapply(DF3$Characteristic, parse.cars)
+# unique(DF3$Car)
+# fix those names
+DF3$Car[DF3$Car == "Голф"] <- 'Фолксваген'
+DF3$Car[DF3$Car == "Ренаулт"] <- 'Рено'
+DF3$Car[DF3$Car == "АУДИ"] <- 'Ауди'
+DF3$Car[DF3$Car == "Рејсер"] <- 'Даеву'
+DF3$Car[DF3$Car == "Ланос"] <- 'Даеву'
+DF3$Car[DF3$Car == "ВВ"] <- 'Фолксваген'
+DF3$Car[DF3$Car == "Хундаи"] <- 'Хјундаи'
+DF3$Car[DF3$Car == "мерцедес"] <- 'Мерцедес'
+DF3$Car[DF3$Car == "КИА"] <- 'Киа'
+DF3$Car[DF3$Car == "Волцваген"] <- 'Фолксваген'
+DF3$Car[DF3$Car == "Мерцедс"] <- 'Мерцедес'
+DF3$Car[DF3$Car == "Авео"] <- 'Шевролет'
+DF3$Car[DF3$Car == "Jeep"] <- 'ГрандЧероки'
+DF3$Car[DF3$Car == "Скутер"] <- 'Моторцикл'
+DF3$Car[DF3$Car == "Мопед"] <- 'Моторцикл'
+DF3$Car[DF3$Car == "Јамаха"] <- 'Моторцикл'
+DF3$Car[DF3$Car == "Априлиа"] <- 'Моторцикл'
+DF3$Car[DF3$Car == "Мотоцикл"] <- 'Моторцикл'
+DF3$Car[DF3$Car == "Оружје"] <- NA
+#table(DF3$Car)
+
+Car.Models <- Corpus(VectorSource(DF3$Car))
+Car.Models <- tm_map(Car.Models, content_transformer(tolower))
+#inspect(Car.Models)
+wordcloud(Car.Models, scale=c(3,0.5),  min.freq = 1, max.words=50, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+```
+
+```{r}
+# Helper to parse year of production;
+parse.year <- function(x) {
+  y <- strsplit(x, split=" ") %>% unlist %>% unname
+  z <- tail(y, n=1)
+    prod <- strsplit(z, split="/") %>% unlist %>% unname
+  z <- prod[1]
+  return(z)
+}   
+
+DF3$Year <- sapply(DF3$Characteristic, parse.year)
+suppressWarnings(DF3$Year <- as.numeric(DF3$Year))
+DF3$Age <- 2017 - DF3$Year
+#summary(DF3$Age)
+#years<-table(DF3$Year)
+#barplot(years)
+```
